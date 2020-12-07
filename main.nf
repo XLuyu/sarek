@@ -3655,6 +3655,7 @@ process VEP {
     vep \
         -i ${vcf} \
         -o ${reducedVCF}_VEP.ann.vcf \
+        --buffer_size 500 \
         --assembly ${genome} \
         --species ${params.species} \
         ${cadd} \
