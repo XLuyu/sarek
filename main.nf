@@ -3123,6 +3123,7 @@ process ConvertAlleleCounts {
     input:
         set idPatient, idSampleNormal, idSampleTumor, file(alleleCountNormal), file(alleleCountTumor) from alleleCounterOut
         val genderMap from genderMap1
+        
     output:
         set idPatient, idSampleNormal, idSampleTumor, file("${idSampleNormal}.BAF"), file("${idSampleNormal}.LogR"), file("${idSampleTumor}.BAF"), file("${idSampleTumor}.LogR") into convertAlleleCountsOut
 
@@ -3150,6 +3151,7 @@ process Ascat {
         set idPatient, idSampleNormal, idSampleTumor, file(bafNormal), file(logrNormal), file(bafTumor), file(logrTumor) from convertAlleleCountsOut
         file(acLociGC) from ch_ac_loci_gc
         val genderMap from genderMap2
+        
     output:
         set val("ASCAT"), idPatient, idSampleNormal, idSampleTumor, file("${idSampleTumor}.*.{png,txt}") into ascatOut
 
