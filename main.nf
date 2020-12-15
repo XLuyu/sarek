@@ -1832,7 +1832,7 @@ tsv_sentieon_recal_sample
 // STEP 4.5: MERGING THE RECALIBRATED BAM FILES
 
 process MergeBamRecal {
-    label 'cpus_8'
+    label 'cpus_2'
 
     tag "${idPatient}-${idSample}"
 
@@ -1854,6 +1854,27 @@ process MergeBamRecal {
     samtools index ${idSample}.recal.bam
     """
 }
+(bam_recalibrated, bam_predict_gender) = bam_recalibrated.into(2)
+
+process BamToGender {
+    label 'cpu'
+    tag "${idPatient}-${idSample}"
+    publishDir "${params.outdir}/Preprocessing/${idSample}/Recalibrated", mode: params.publish_dir_mode
+
+    input:
+        set idPatient, idSample, file("${idSample}.recal.bam"), file("${idSample}.recal.bam.bai") from bam_predict_gender
+
+    output:
+        set idPatient, idSample, stdout, file("${idSample}.gender") into sample_gender
+
+    script:
+    """
+        samtools view ${idSample}.recal.bam | awk 'BEGIN{x=0;y=0;} \$3=="chrX" {x+=1;} \$3=="chrY"{y+=1;} END {if (y/x>0.1) print y/x, "XY"; else print y/x, "XX";}' > ${idSample}.gender
+        awk 'BEGIN{ORS=""} {print \$2}' ${idSample}.gender
+    """
+}
+
+(genderMap1, genderMap2) = Channel.value(sample_gender.reduce([:]) {map, row -> map << [(row[0]): row[2]]}.getVal()).into(2)
 
 // STEP 4.5': INDEXING THE RECALIBRATED BAM FILES
 
@@ -3101,7 +3122,7 @@ process ConvertAlleleCounts {
 
     input:
         set idPatient, idSampleNormal, idSampleTumor, file(alleleCountNormal), file(alleleCountTumor) from alleleCounterOut
-
+        val genderMap from genderMap1
     output:
         set idPatient, idSampleNormal, idSampleTumor, file("${idSampleNormal}.BAF"), file("${idSampleNormal}.LogR"), file("${idSampleTumor}.BAF"), file("${idSampleTumor}.LogR") into convertAlleleCountsOut
 
@@ -3128,7 +3149,7 @@ process Ascat {
     input:
         set idPatient, idSampleNormal, idSampleTumor, file(bafNormal), file(logrNormal), file(bafTumor), file(logrTumor) from convertAlleleCountsOut
         file(acLociGC) from ch_ac_loci_gc
-
+        val genderMap from genderMap2
     output:
         set val("ASCAT"), idPatient, idSampleNormal, idSampleTumor, file("${idSampleTumor}.*.{png,txt}") into ascatOut
 
