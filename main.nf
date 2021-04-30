@@ -1859,7 +1859,7 @@ process MergeBamRecal {
 process BamToGender {
     label 'cpu'
     tag "${idPatient}-${idSample}"
-    publishDir "${params.outdir}/Preprocessing/${idSample}/Recalibrated", mode: params.publish_dir_mode
+    publishDir "${params.outdir}/Annotation/${idSample}", mode: params.publish_dir_mode
 
     input:
         set idPatient, idSample, file("${idSample}.recal.bam"), file("${idSample}.recal.bam.bai") from bam_predict_gender
@@ -3674,7 +3674,8 @@ process VEP {
     genesplicer = params.genesplicer ? "--plugin GeneSplicer,/opt/conda/envs/nf-core-sarek-${workflow.manifest.version}/bin/genesplicer,/opt/conda/envs/nf-core-sarek-${workflow.manifest.version}/share/genesplicer-1.0-1/human,context=200,tmpdir=\$PWD/${reducedVCF}" : "--offline"
     """
     mkdir ${reducedVCF}
-
+    mkdir /.vep
+    aws s3 cp --recursive s3://luyu-nextflow/reference/VEP_99_GRCh38 /.vep/
     vep \
         -i ${vcf} \
         -o ${reducedVCF}_VEP.ann.vcf \
