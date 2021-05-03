@@ -383,6 +383,7 @@ if (params.genomes && !params.genomes.containsKey(params.genome) && !params.igen
 
 stepList = defineStepList()
 step = params.step ? params.step.toLowerCase().replaceAll('-', '').replaceAll('_', '') : ''
+manta_germline = params.manta_germline ? params.manta_germline : false
 
 // Handle deprecation
 if (step == 'preprocessing') step = 'mapping'
@@ -2009,12 +2010,19 @@ if (step == 'variantcalling') bam_recalibrated = inputSample
 
 bam_recalibrated = bam_recalibrated.dump(tag:'BAM for Variant Calling')
 
+// separate BAM by status
+(bam_recalibrated, bamRecalAll) = bam_recalibrated.into(2)
+bamNormal = Channel.create()
+bamTumor = Channel.create()
+
+bam_recalibrated.choice(bamTumor, bamNormal) {statusMap[it[0], it[1]] == 0 ? 1 : 0}
+
 // Here we have a recalibrated bam set
 // The TSV file is formatted like: "idPatient status idSample bamFile baiFile"
 // Manta will be run in Germline mode, or in Tumor mode depending on status
 // HaplotypeCaller, TIDDIT and Strelka will be run for Normal and Tumor samples
 
-(bamMantaSingle, bamStrelkaSingle, bamTIDDIT, bamFreebayesSingleNoIntervals, bamHaplotypeCallerNoIntervals, bamRecalAll) = bam_recalibrated.into(6)
+(bamMantaSingle, bamStrelkaSingle, bamTIDDIT, bamFreebayesSingleNoIntervals, bamHaplotypeCallerNoIntervals, bamNormal) = bamNormal.into(6)
 
 (bam_sentieon_DNAseq, bam_sentieon_DNAscope, bam_sentieon_all) = bam_sentieon_deduped_table.into(3)
 
@@ -2263,7 +2271,7 @@ process MantaSingle {
     output:
         set val("Manta"), idPatient, idSample, file("*.vcf.gz"), file("*.vcf.gz.tbi") into vcfMantaSingle
 
-    when: 'manta' in tools
+    when: 'manta' in tools && manta_germline
 
     script:
     beforeScript = params.target_bed ? "bgzip --threads ${task.cpus} -c ${targetBED} > call_targets.bed.gz ; tabix call_targets.bed.gz" : ""
@@ -2374,13 +2382,6 @@ vcfFreebayesSingle = vcfFreebayesSingle.groupTuple(by: [0,1,2])
 */
 // Ascat, pileup, pileups with no intervals, recalibrated BAMs
 (bamAscat, bamMpileup, bamMpileupNoInt, bamRecalAll) = bamRecalAll.into(4)
-
-// separate BAM by status
-bamNormal = Channel.create()
-bamTumor = Channel.create()
-
-bamRecalAll
-    .choice(bamTumor, bamNormal) {statusMap[it[0], it[1]] == 0 ? 1 : 0}
 
 // Crossing Normal and Tumor to get a T/N pair for Somatic Variant Calling
 // Remapping channel to remove common key idPatient
